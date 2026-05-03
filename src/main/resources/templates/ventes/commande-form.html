@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Nouvelle commande client</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="page-header mb-4">
+        <h1 th:text="${commande?.id != null ? 'Modifier commande ' + commande.numero : 'Nouvelle commande client'}"></h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/dashboard}">Accueil</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/ventes/commandes}">Commandes</a></li>
+                <li class="breadcrumb-item active">Nouveau</li>
+            </ol>
+        </nav>
+    </div>
+    
+    <form th:action="@{/ventes/commandes/save}" method="post" th:object="${commande}">
+        <input type="hidden" th:field="*{id}" />
+        
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">Informations client</div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Client <span class="text-danger">*</span></label>
+                                <select class="form-select" th:field="*{client.id}" required id="client-select">
+                                    <option value="">-- Sélectionner un client --</option>
+                                    <option th:each="client : ${clients}" th:value="${client.id}" 
+                                            th:text="${client.name}"></option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Site <span class="text-danger">*</span></label>
+                                <select class="form-select" th:field="*{site.id}" required id="site-select">
+                                    <option value="">-- Sélectionner un site --</option>
+                                    <option th:each="site : ${sites}" th:value="${site.id}" th:text="${site.name}"></option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" th:field="*{notes}" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lignes de la commande -->
+                <div class="card mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Lignes de la commande</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addLigneCommande()">
+                            <i class="bi bi-plus-lg me-1"></i>Ajouter article
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table" id="lignes-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 35%">Article</th>
+                                        <th style="width: 15%">Quantité</th>
+                                        <th style="width: 15%">Prix unit.</th>
+                                        <th style="width: 10%">Remise %</th>
+                                        <th style="width: 15%">Total HT</th>
+                                        <th style="width: 10%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lignes-body">
+                                    <tr class="ligne-row" th:each="ligne, stat : ${commande?.lignes ?: #lists.emptyList()}">
+                                        <input type="hidden" th:name="'lignes[' + ${stat.index} + '].id'" th:value="${ligne.id}" />
+                                        <td>
+                                            <select class="form-select form-select-sm article-select" th:name="'lignes[' + ${stat.index} + '].article.id'" required>
+                                                <option value="">-- Sélectionner --</option>
+                                                <option th:each="article : ${articles}" th:value="${article.id}" 
+                                                        th:text="|${article.sku} - ${article.label}|" 
+                                                        th:selected="${article.id == ligne.article?.id}"></option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm qty-input" th:name="'lignes[' + ${stat.index} + '].qty'" th:value="${ligne.qty}" step="0.01" min="0.01" required />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm prix-input" th:name="'lignes[' + ${stat.index} + '].priceUnit'" th:value="${ligne.priceUnit}" step="0.01" min="0" required />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm remise-input" th:name="'lignes[' + ${stat.index} + '].remisePct'" th:value="${ligne.remisePct ?: 0}" step="0.01" min="0" max="100" />
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm total-input" readonly th:value="${ligne.montantHT}" />
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLigneCommande(this)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-light">
+                                        <th colspan="4" class="text-end">Total HT</th>
+                                        <th id="total-ht">0.00</th>
+                                        <th></th>
+                                    </tr>
+                                    <tr class="table-light">
+                                        <th colspan="4" class="text-end">TVA</th>
+                                        <th id="total-tva">0.00</th>
+                                        <th></th>
+                                    </tr>
+                                    <tr class="table-primary">
+                                        <th colspan="4" class="text-end">Total TTC</th>
+                                        <th id="total-ttc">0.00</th>
+                                        <th></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Panneau latéral -->
+            <div class="col-lg-4">
+                <!-- Actions -->
+                <div class="card">
+                    <div class="card-header">Actions</div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-2"></i>Enregistrer
+                            </button>
+                            <a th:href="@{/ventes/commandes}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Annuler
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+    
+    <!-- Template pour nouvelle ligne -->
+    <template id="ligne-template">
+        <tr class="ligne-row">
+            <td>
+                <select class="form-select form-select-sm article-select" name="lignes[INDEX].article.id" required>
+                    <option value="">-- Sélectionner --</option>
+                    <option th:each="article : ${articles}" th:value="${article.id}" th:text="|${article.sku} - ${article.label}|"></option>
+                </select>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm qty-input" name="lignes[INDEX].qty" step="0.01" min="0.01" required />
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm prix-input" name="lignes[INDEX].priceUnit" value="0" step="0.01" min="0" required />
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm remise-input" name="lignes[INDEX].remisePct" value="0" step="0.01" min="0" max="100" />
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm total-input" readonly value="0.00" />
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLigneCommande(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    </template>
+    
+    <script th:inline="javascript">
+        let ligneIndex = [[${commande?.lignes?.size() ?: 0}]];
+        
+        function addLigneCommande() {
+            const template = document.getElementById('ligne-template');
+            const tbody = document.getElementById('lignes-body');
+            
+            let html = template.innerHTML.replace(/INDEX/g, ligneIndex);
+            tbody.insertAdjacentHTML('beforeend', html);
+            ligneIndex++;
+            recalculerTotaux();
+        }
+        
+        function removeLigneCommande(button) {
+            button.closest('tr').remove();
+            recalculerTotaux();
+        }
+        
+        function recalculerTotaux() {
+            let totalHT = 0;
+            
+            document.querySelectorAll('.ligne-row').forEach(row => {
+                const qty = parseFloat(row.querySelector('.qty-input')?.value || 0);
+                const prix = parseFloat(row.querySelector('.prix-input')?.value || 0);
+                const remise = parseFloat(row.querySelector('.remise-input')?.value || 0);
+                
+                let montantLigne = qty * prix;
+                if (remise > 0) {
+                    montantLigne = montantLigne * (1 - remise / 100);
+                }
+                
+                const totalInput = row.querySelector('.total-input');
+                if (totalInput) {
+                    totalInput.value = montantLigne.toFixed(2);
+                }
+                
+                totalHT += montantLigne;
+            });
+            
+            const tva = totalHT * 0.20; // 20% TVA
+            const totalTTC = totalHT + tva;
+            
+            document.getElementById('total-ht').textContent = totalHT.toFixed(2);
+            document.getElementById('total-tva').textContent = tva.toFixed(2);
+            document.getElementById('total-ttc').textContent = totalTTC.toFixed(2);
+        }
+        
+        // Attacher les événements aux champs existants
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('lignes-body').addEventListener('input', function(e) {
+                if (e.target.matches('.qty-input, .prix-input, .remise-input')) {
+                    recalculerTotaux();
+                }
+            });
+            
+            recalculerTotaux();
+        });
+    </script>
+</div>
+</body>
+</html>
